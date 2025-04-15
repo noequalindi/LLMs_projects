@@ -5,6 +5,7 @@ import fitz  # PyMuPDF
 from groq import Groq
 from transformers import pipeline
 from pinecone import Pinecone, ServerlessSpec
+from textwrap import wrap
 
 # -------------------------
 # Load environment variables
@@ -69,11 +70,13 @@ def extract_text_from_pdf(pdf_route):
         text += pagina.get_text()
     return text.strip()
 
+def chunk_text(text, max_tokens=dimension):
+    return wrap(text, width=max_tokens, break_long_words=False, replace_whitespace=False)
+
 # -------------------------
 # Load CVs (PDF or TXT) to Pinecone
 # -------------------------
 def load_cvs_to_pinecone(folder="cvs"):
-
     print(f"📂 Procesando archivos de {folder}/...")
 
     for file_name in os.listdir(folder):
@@ -88,13 +91,24 @@ def load_cvs_to_pinecone(folder="cvs"):
                 else:
                     content = extract_text_from_pdf(path)
 
-                embedding = get_embedding(content)
-                doc_id = file_name.replace(".txt", "").replace(".pdf", "")
-                index.upsert(vectors=[(doc_id, embedding.tolist(), {"text": content})])
-                print(f"✔️ Cargado: {file_name}")
+                chunks = chunk_text(content, max_tokens=dimension)
+                doc_id_base = file_name.replace(".txt", "").replace(".pdf", "")
+                vectors = []
+
+                for i, chunk in enumerate(chunks):
+                    emb = get_embedding(chunk)
+                    chunk_id = f"{doc_id_base}_chunk{i}"
+                    vectors.append((chunk_id, emb.tolist(), {"text": chunk}))
+
+                if vectors:
+                    index.upsert(vectors=vectors)
+                    print(f"✔️ {len(vectors)} chunks cargados para {file_name}")
+                else:
+                    print(f"⚠️ {file_name} está vacío o no se pudo dividir.")
 
             except Exception as e:
                 print(f"❌ Error al procesar {file_name}: {e}")
+
 
 # -------------------------
 # Chatbot function
