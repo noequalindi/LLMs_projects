@@ -17,7 +17,9 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 client = Groq(api_key=GROQ_API_KEY)
 dimension = 384 
 
-CVS_ROUTE = os.path.join(os.path.dirname(__file__), "cvs")
+PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
+CVS_ROUTE = os.path.join(PROJECT_ROOT, "..", "cvs")
+
 if not os.path.exists(CVS_ROUTE):
     os.makedirs(CVS_ROUTE)
 
